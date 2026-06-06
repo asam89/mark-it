@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mark-It
+
+AI-Powered Small Business Marketing Platform — your intelligent marketing operating system.
+
+## Overview
+
+Mark-It uses large language models to deeply understand each business, its industry, location, and regulatory constraints, then provides intelligent marketing strategy recommendations, channel management, budget allocation, and ROI tracking — all from a single dashboard.
+
+## Tech Stack
+
+- **Frontend:** Next.js 14 (App Router), React, Tailwind CSS
+- **Backend:** Next.js API Routes (Route Handlers)
+- **Database:** PostgreSQL + Prisma ORM
+- **Auth:** NextAuth.js (email/password + Google OAuth)
+- **AI/LLM:** OpenAI GPT-4o + Anthropic Claude (configurable)
+- **Payments:** Stripe (subscription billing)
+- **Deployment:** Vercel (frontend) + managed PostgreSQL
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20+
+- PostgreSQL 15+
+- npm
+
+### Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Copy env template
+cp .env.example .env
+# Fill in your environment variables
+
+# Generate Prisma client
+npx prisma generate
+
+# Run database migrations
+npx prisma migrate dev
+
+# Start dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See `.env.example` for all required variables. Key ones:
 
-## Learn More
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | Random secret for session encryption |
+| `LLM_PROVIDER` | `openai` or `anthropic` |
+| `OPENAI_API_KEY` | OpenAI API key (if using OpenAI) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (if using Anthropic) |
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/
+│   ├── (auth)/          # Login/signup pages
+│   ├── (dashboard)/     # Protected dashboard pages
+│   ├── api/             # Route handlers (REST API)
+│   └── page.tsx         # Landing page
+├── components/
+│   ├── ui/              # Reusable UI primitives
+│   ├── dashboard/       # Dashboard-specific components
+│   └── onboarding/      # AI onboarding chat
+├── config/
+│   └── prompts.ts       # Externalized LLM prompts
+└── lib/
+    ├── ai.ts            # LLM service (OpenAI + Anthropic)
+    ├── auth.ts          # NextAuth configuration
+    ├── db.ts            # Prisma client singleton
+    └── validations.ts   # Zod schemas
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Features (Phase 1 MVP)
 
-## Deploy on Vercel
+- [x] User signup with email verification
+- [x] AI-driven business profiling (conversational intake)
+- [x] Configurable LLM (OpenAI / Anthropic)
+- [x] Marketing channel connection management
+- [x] AI budget allocation engine
+- [x] Unified analytics dashboard
+- [x] ROI "Worth-It" meter
+- [x] Manual lead tracking
+- [x] Subscription tiers via Stripe
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Proprietary — All rights reserved.
