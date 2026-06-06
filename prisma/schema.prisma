@@ -1,0 +1,340 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth Models (NextAuth compatible) ───────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  role          UserRole  @default(BUSINESS_OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  businesses Business[]
+  teamMemberships TeamMember[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Business Models ─────────────────────────────────────────────────────────
+
+model Business {
+  id          String       @id @default(cuid())
+  ownerId     String
+  name        String
+  type        BusinessType
+  industry    String?
+  address     String?
+  city        String?
+  province    String?
+  country     String?
+  postalCode  String?
+  phone       String?
+  website     String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // AI Profile
+  profile     BusinessProfile?
+
+  // Relations
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  channels    Channel[]
+  leads       Lead[]
+  budgets     BudgetAllocation[]
+  recommendations Recommendation[]
+  teamMembers TeamMember[]
+  subscription Subscription?
+  intakeSessions IntakeSession[]
+
+  @@map("businesses")
+}
+
+model BusinessProfile {
+  id                    String   @id @default(cuid())
+  businessId            String   @unique
+  targetDemographic     Json?
+  servicesProducts      Json?
+  pricePoints           Json?
+  uniqueValueProp       String?  @db.Text
+  currentMarketing      String?  @db.Text
+  marketingGoals        Json?
+  revenueRange          String?
+  competitors           Json?
+  complianceRules       Json?
+  avgTransactionValue   Decimal? @db.Decimal(10, 2)
+  profileSummary        String?  @db.Text
+  isComplete            Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("business_profiles")
+}
+
+model IntakeSession {
+  id         String   @id @default(cuid())
+  businessId String
+  messages   Json     @default("[]")
+  status     IntakeStatus @default(IN_PROGRESS)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("intake_sessions")
+}
+
+// ─── Marketing Channel Models ────────────────────────────────────────────────
+
+model Channel {
+  id             String        @id @default(cuid())
+  businessId     String
+  platform       Platform
+  status         ChannelStatus @default(NOT_CONNECTED)
+  accessToken    String?       @db.Text
+  refreshToken   String?       @db.Text
+  tokenExpiresAt DateTime?
+  accountId      String?
+  accountName    String?
+  lastSyncAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  metrics  ChannelMetric[]
+
+  @@unique([businessId, platform])
+  @@map("channels")
+}
+
+model ChannelMetric {
+  id          String   @id @default(cuid())
+  channelId   String
+  date        DateTime @db.Date
+  spend       Decimal  @default(0) @db.Decimal(10, 2)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  reach       Int      @default(0)
+  engagement  Int      @default(0)
+  leads       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, date])
+  @@map("channel_metrics")
+}
+
+// ─── Budget & Strategy Models ────────────────────────────────────────────────
+
+model BudgetAllocation {
+  id             String   @id @default(cuid())
+  businessId     String
+  month          DateTime @db.Date
+  totalBudget    Decimal  @db.Decimal(10, 2)
+  allocations    Json
+  isAiGenerated  Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, month])
+  @@map("budget_allocations")
+}
+
+model Recommendation {
+  id          String              @id @default(cuid())
+  businessId  String
+  type        RecommendationType
+  title       String
+  content     String              @db.Text
+  priority    Int                 @default(0)
+  isDismissed Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("recommendations")
+}
+
+// ─── Lead Tracking ───────────────────────────────────────────────────────────
+
+model Lead {
+  id         String     @id @default(cuid())
+  businessId String
+  name       String
+  email      String?
+  phone      String?
+  source     Platform?
+  status     LeadStatus @default(LEAD)
+  value      Decimal?   @db.Decimal(10, 2)
+  notes      String?    @db.Text
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("leads")
+}
+
+// ─── Team & Permissions ──────────────────────────────────────────────────────
+
+model TeamMember {
+  id         String         @id @default(cuid())
+  userId     String
+  businessId String
+  role       TeamMemberRole @default(VIEWER)
+  createdAt  DateTime       @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+  @@map("team_members")
+}
+
+// ─── Subscription & Billing ──────────────────────────────────────────────────
+
+model Subscription {
+  id               String           @id @default(cuid())
+  businessId       String           @unique
+  tier             SubscriptionTier @default(STARTER)
+  stripeCustomerId String?
+  stripeSubId      String?
+  status           SubStatus        @default(TRIALING)
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  BUSINESS_OWNER
+  TEAM_MEMBER
+  PLATFORM_ADMIN
+}
+
+enum BusinessType {
+  LAW_FIRM
+  MEDICAL_OFFICE
+  DENTAL_OFFICE
+  RESTAURANT
+  COFFEE_SHOP
+  RETAIL
+  OTHER
+}
+
+enum Platform {
+  META
+  INSTAGRAM
+  GOOGLE
+  TIKTOK
+  LINKEDIN
+  YOUTUBE
+}
+
+enum ChannelStatus {
+  CONNECTED
+  NOT_CONNECTED
+  ERROR
+  EXPIRED
+}
+
+enum IntakeStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum RecommendationType {
+  CHANNEL
+  BUDGET
+  CONTENT
+  PERFORMANCE
+}
+
+enum LeadStatus {
+  LEAD
+  CONVERTED
+  LOST
+}
+
+enum TeamMemberRole {
+  EDITOR
+  VIEWER
+}
+
+enum SubscriptionTier {
+  STARTER
+  GROWTH
+  PRO
+}
+
+enum SubStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
