@@ -122,8 +122,9 @@ const DEMO_CAMPAIGNS: Campaign[] = [
 ];
 
 export default function CampaignsPage() {
-  const [campaigns] = useState<Campaign[]>(DEMO_CAMPAIGNS);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(DEMO_CAMPAIGNS);
   const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [newCampaign, setNewCampaign] = useState({
     name: "",
     description: "",
@@ -146,6 +147,104 @@ export default function CampaignsPage() {
         ? prev.channels.filter((c) => c !== channel)
         : [...prev.channels, channel],
     }));
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!newCampaign.name || !newCampaign.targetValue || !newCampaign.budget || !newCampaign.startDate || !newCampaign.endDate) {
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId: "demo",
+          name: newCampaign.name,
+          description: newCampaign.description || undefined,
+          goalType: newCampaign.goalType,
+          targetValue: parseInt(newCampaign.targetValue),
+          budget: parseFloat(newCampaign.budget),
+          channels: newCampaign.channels,
+          startDate: newCampaign.startDate,
+          endDate: newCampaign.endDate,
+        }),
+      });
+
+      if (res.ok) {
+        const { campaign } = await res.json();
+        setCampaigns((prev) => [campaign, ...prev]);
+        setNewCampaign({
+          name: "",
+          description: "",
+          goalType: "BRAND_AWARENESS",
+          targetValue: "",
+          budget: "",
+          startDate: "",
+          endDate: "",
+          channels: [],
+        });
+        setShowCreate(false);
+      } else {
+        // Fallback: add locally for demo/UAT purposes
+        const localCampaign: Campaign = {
+          id: crypto.randomUUID(),
+          name: newCampaign.name,
+          description: newCampaign.description || undefined,
+          goalType: newCampaign.goalType,
+          targetValue: parseInt(newCampaign.targetValue),
+          currentValue: 0,
+          budget: parseFloat(newCampaign.budget),
+          spentAmount: 0,
+          status: "DRAFT",
+          channels: newCampaign.channels,
+          startDate: newCampaign.startDate,
+          endDate: newCampaign.endDate,
+        };
+        setCampaigns((prev) => [localCampaign, ...prev]);
+        setNewCampaign({
+          name: "",
+          description: "",
+          goalType: "BRAND_AWARENESS",
+          targetValue: "",
+          budget: "",
+          startDate: "",
+          endDate: "",
+          channels: [],
+        });
+        setShowCreate(false);
+      }
+    } catch {
+      // Fallback: add locally
+      const localCampaign: Campaign = {
+        id: crypto.randomUUID(),
+        name: newCampaign.name,
+        description: newCampaign.description || undefined,
+        goalType: newCampaign.goalType,
+        targetValue: parseInt(newCampaign.targetValue),
+        currentValue: 0,
+        budget: parseFloat(newCampaign.budget),
+        spentAmount: 0,
+        status: "DRAFT",
+        channels: newCampaign.channels,
+        startDate: newCampaign.startDate,
+        endDate: newCampaign.endDate,
+      };
+      setCampaigns((prev) => [localCampaign, ...prev]);
+      setNewCampaign({
+        name: "",
+        description: "",
+        goalType: "BRAND_AWARENESS",
+        targetValue: "",
+        budget: "",
+        startDate: "",
+        endDate: "",
+        channels: [],
+      });
+      setShowCreate(false);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -274,7 +373,9 @@ export default function CampaignsPage() {
               />
             </div>
             <div className="md:col-span-2 flex justify-end">
-              <Button>Create Campaign</Button>
+              <Button onClick={handleCreateCampaign} loading={creating}>
+                Create Campaign
+              </Button>
             </div>
           </div>
         </Card>

@@ -27,6 +27,17 @@ const createCampaignSchema = z.object({
   endDate: z.string(),
 });
 
+const updateCampaignSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"]).optional(),
+  currentValue: z.number().int().min(0).optional(),
+  spentAmount: z.number().min(0).optional(),
+});
+
+function getUserId(session: { user?: Record<string, unknown> }): string {
+  return (session.user as { id: string }).id;
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -41,6 +52,14 @@ export async function GET(request: NextRequest) {
       { error: "businessId is required" },
       { status: 400 }
     );
+  }
+
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, ownerId: getUserId(session) },
+  });
+
+  if (!business) {
+    return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
   const campaigns = await prisma.campaign.findMany({
@@ -69,6 +88,14 @@ export async function POST(request: NextRequest) {
 
   const { businessId, name, description, goalType, targetValue, budget, channels, startDate, endDate } = parsed.data;
 
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, ownerId: getUserId(session) },
+  });
+
+  if (!business) {
+    return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  }
+
   const campaign = await prisma.campaign.create({
     data: {
       businessId,
@@ -93,10 +120,32 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { id, status, currentValue, spentAmount } = body;
+  const parsed = updateCampaignSchema.safeParse(body);
 
-  if (!id) {
-    return NextResponse.json({ error: "Campaign id is required" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid input", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const { id, status, currentValue, spentAmount } = parsed.data;
+
+  const campaign = await prisma.campaign.findUnique({
+    where: { id },
+    select: { businessId: true },
+  });
+
+  if (!campaign) {
+    return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+  }
+
+  const business = await prisma.business.findFirst({
+    where: { id: campaign.businessId, ownerId: getUserId(session) },
+  });
+
+  if (!business) {
+    return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
 
   const updateData: Record<string, unknown> = {};
@@ -104,10 +153,10 @@ export async function PATCH(request: NextRequest) {
   if (currentValue !== undefined) updateData.currentValue = currentValue;
   if (spentAmount !== undefined) updateData.spentAmount = spentAmount;
 
-  const campaign = await prisma.campaign.update({
+  const updated = await prisma.campaign.update({
     where: { id },
     data: updateData,
   });
 
-  return NextResponse.json({ campaign });
+  return NextResponse.json({ campaign: updated });
 }
