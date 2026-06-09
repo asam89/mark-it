@@ -1,0 +1,8 @@
+[Unit]
+Description=Mark-It PostgreSQL Backup
+After=markit.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mark-it
+ExecStart=/opt/mark-it/deploy/scripts/backup-db.sh

@@ -119,7 +119,113 @@ src/
 
 ## Production Deployment
 
-### Vercel (Recommended)
+### Option A: OCI Ampere A1 (Self-Hosted — Recommended for Full Control)
+
+Deploy to Oracle Cloud's Always Free ARM64 instances (4 OCPUs, 24GB RAM).
+
+#### Prerequisites
+
+- OCI account with an Ampere A1 compute instance (Ubuntu 22.04+ ARM64)
+- Domain pointed to the instance's public IP (A record)
+- SSH access to the instance
+
+#### Quick Start (Automated)
+
+```bash
+# SSH into your OCI instance
+ssh ubuntu@<your-instance-ip>
+
+# Clone and run setup
+git clone https://github.com/asam89/mark-it.git /opt/mark-it
+sudo bash /opt/mark-it/deploy/scripts/setup-oci.sh
+```
+
+This installs Docker, configures the firewall, sets up systemd services, and prepares the app.
+
+#### Manual Setup
+
+```bash
+# 1. Install Docker
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+
+# 2. Clone repo
+git clone https://github.com/asam89/mark-it.git /opt/mark-it
+cd /opt/mark-it
+
+# 3. Configure environment
+cp .env.example .env
+nano .env  # Fill in all secrets
+
+# 4. Start everything
+docker compose up -d
+
+# 5. Run database migrations
+docker compose exec app npx prisma db push
+
+# 6. Get TLS certificate (after DNS is pointed)
+sudo ./deploy/scripts/ssl-init.sh you@example.com
+```
+
+#### Architecture on OCI
+
+```
+Internet → OCI Public IP → Nginx (TLS :443)
+                              ↓
+                         Next.js App (:3000)
+                              ↓
+                         PostgreSQL (:5432)
+```
+
+All services run as Docker containers managed by `docker compose` + systemd.
+
+#### OCI-Specific Configuration
+
+| Setting | Value |
+|---------|-------|
+| Shape | VM.Standard.A1.Flex (ARM64) |
+| OS | Ubuntu 22.04 Minimal (aarch64) |
+| OCPUs | 2-4 (scale as needed within free tier) |
+| Memory | 12-24 GB |
+| Boot Volume | 50 GB |
+| Ingress Rules | TCP 22, 80, 443 |
+
+> **OCI Security List:** Ensure your VCN's security list allows inbound TCP on ports 22, 80, and 443.
+
+#### Maintenance Commands
+
+```bash
+# View logs
+docker compose logs -f app
+
+# Redeploy after code changes
+./deploy/scripts/deploy.sh init-main
+
+# Manual database backup
+./deploy/scripts/backup-db.sh
+
+# Restart services
+sudo systemctl restart markit
+
+# Check status
+docker compose ps
+```
+
+#### Automated Backups
+
+PostgreSQL is backed up daily at 2AM via systemd timer. Backups are stored in `/opt/mark-it/backups/` with 7-day retention.
+
+```bash
+# Enable backup timer
+sudo systemctl enable --now markit-backup.timer
+
+# Check timer status
+systemctl list-timers markit-backup.timer
+```
+
+---
+
+### Option B: Vercel (Serverless — Simplest)
 
 ```bash
 # Install Vercel CLI
@@ -133,9 +239,12 @@ Set all environment variables in Vercel dashboard → Settings → Environment V
 
 ### Database (Neon / Supabase)
 
-1. Create a PostgreSQL database on [Neon](https://neon.tech) or [Supabase](https://supabase.com)
-2. Copy the connection string to `DATABASE_URL`
-3. Run `npx prisma db push` to sync schema
+For either deployment option, you need a PostgreSQL database:
+
+1. **OCI (self-hosted):** Already included via Docker Compose — no external DB needed
+2. **Vercel:** Create a PostgreSQL database on [Neon](https://neon.tech) or [Supabase](https://supabase.com)
+
+Copy the connection string to `DATABASE_URL` and run `npx prisma db push` to sync schema.
 
 ## Marketing Campaigns
 
